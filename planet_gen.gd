@@ -119,7 +119,7 @@ func draw_sphere():
 
 	var verts := []
 	
-	var poisson := Poisson.new(0.03)
+	var poisson := Poisson.new(0.1)
 	var samples := poisson.get_all_points()
 	
 	var new_south: Vector2 = samples.pop_front()

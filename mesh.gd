@@ -16,10 +16,19 @@ static func next_half_edge(e: int):
 	else:
 		return e + 1
 
+static func previous_half_edge(e: int):
+	if e % 3 == 0:
+		return e + 2
+	else:
+		return e - 1
+
 # takes an edge e and returns which triangle it belongs to 
 static func triangle_number(e: int) -> int:
 	# warning-ignore:integer_division
 	return e / 3
+
+func opposite_point(e: int) -> int:
+	return triangles[previous_half_edge(half_edges[e])]
 
 # takes a half edge and returns the indices of the root / base ("Begin") of the 
 # half edge and the end ("End") in a dictionary with the respective entries
@@ -61,8 +70,29 @@ func extend_half_edge_with_point(\
 	_link(opp1, new_half_edge + 1)
 	_link(opp2, new_half_edge + 2)
 
-func flip() -> void:
-	pass
+func flip(a: int) -> int:
+	var b = half_edges[a]
+	
+	if a == -1 or b == -1:
+		return -1
+	
+	var new_mid_a = previous_half_edge(a)
+	var new_mid_b = previous_half_edge(b)
+	
+	var b_opposite_point = triangles[new_mid_a]
+	var a_opposite_point = triangles[new_mid_b]
+	
+	var new_opposite_a = half_edges[new_mid_b]
+	var new_opposite_b = half_edges[new_mid_a]
+	
+	triangles[a] = a_opposite_point
+	triangles[b] = b_opposite_point
+	
+	_link(new_mid_a, new_mid_b)
+	_link(a, new_opposite_a)
+	_link(b, new_opposite_b)
+	
+	return new_mid_b
 
 func add_tri(a : int, b: int, c: int, onto_a: int = -1, onto_b: int = -1, onto_c: int = -1) -> void:
 	triangles.append(a)

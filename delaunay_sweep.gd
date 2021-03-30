@@ -140,25 +140,14 @@ func _init_first_triangle():
 
 
 func _create_triangle_along_hull_edge(h: int, p: int) -> int:
+	# save data about the state for use later
 	var e = hull[h]
 	var new_half_edge = mesh.triangles.size()
 
-	# we are trying to create a ccw triangle from a boundary edge
-	# that is going ccw, so the boundary edge should be reversed
-	# when creating the new triangle
-	
-	# add edge opposite to the new point which starts at the end of the 
-	# hull edge
-	#triangles.append(triangles[_next_half_edge(e)])
-	
-	# add first the lower and than the upper edge
-	#triangles.append(triangles[e])
-	#triangles.append(p)
-	
-	#_link(e, new_half_edge)
-
 	hull.remove(h)
 	
+	# the next edges and previous edges in the hull, seen relative
+	# to the base edge that was just removed
 	var next_h = posmod(h, hull.size())
 	var prev_h = posmod(h - 1, hull.size())
 	
@@ -172,7 +161,6 @@ func _create_triangle_along_hull_edge(h: int, p: int) -> int:
 	# check whether the lower of the new hull edges already exists (reversed)
 	# in the hull
 	if mesh.triangles[hull[prev_h]] == p:
-		#_link(hull[prev_h], new_half_edge + 1)
 		lower_edge_opposite = hull[prev_h]
 		
 		# remove the reverse edge from the hull and decrement the next hull
@@ -184,18 +172,19 @@ func _create_triangle_along_hull_edge(h: int, p: int) -> int:
 		# the reverse edge doesn't exist, so we can add the lower edge
 		# to the hull and it's opposite doesn't exist
 		hull.insert(next_h, new_half_edge + 1)
-		#_link(new_half_edge + 1, -1)
 		
 		next_h = posmod(next_h + 1, hull.size())
 	
-	# add the upper edge of the new triangle to the hull and link it empty
+	# add the upper edge of the new triangle to the hull 
 	hull.insert(next_h, new_half_edge + 2)
-	#_link(new_half_edge + 2, -1)
 	
 	# add the new triangle to the mesh
 	mesh.extend_half_edge_with_point(e, p, \
 		lower_edge_opposite, upper_edge_opposite)
 	
+	# go through half edges, flipping them as needed so that the 
+	# triangulation remains delaunay, this returns the correct
+	# next edge in the hull
 	var ar = _legalize(new_half_edge)
 	hull[next_h] = ar
 	
@@ -226,10 +215,7 @@ func _legalize(a: int) -> int:
 	var ar := a0 + ((a + 2) % 3)
 	
 	while true:
-		
 		var b = mesh.half_edges[a]
-		a0 = a - (a % 3)
-		ar = a0 + ((a + 2) % 3)
 		
 		if b == -1:
 			if stack.empty():
@@ -238,52 +224,47 @@ func _legalize(a: int) -> int:
 			a = stack.pop_back()
 			continue
 		
-		#TODO simplify these expressions by using next_half_edge etc.
-		var al = a0 + ((a + 1) % 3)
+		# TODO simplify these expressions by using next_half_edge etc.
+		# and get rid of them if possible
+		a0 = a - (a % 3)
+		ar = a0 + ((a + 2) % 3)
+
+		# get indices for all the points from a's triangle and for the 
+		# point in b's triangle that isn't in a and check for 
+		# inclusion in the circumscribed circle
+		var ip0 = mesh.triangles[a]
+		var ip1 = mesh.triangles[_next_half_edge(a)]
+		var ip2 = mesh.triangles[mesh.previous_half_edge(a)]
 		
-		var b0 = b - (b % 3)
-		var br = b0 + ((b + 1) % 3)
-		var bl = b0 + ((b + 2) % 3)
+		var ip_opp = mesh.triangles[mesh.previous_half_edge(mesh.half_edges[a])]
 		
-		# NOTE order of triangles matter? is ar and al swapped if triangle order
-		# different?
-		# a0 is different... but then ar, al depend also on a
-		# the only way in which the legalization code is different to delaunator
-		# is the change of operator < to > in circumcircle check... why does
-		# this need to be done?
-		var p0 = mesh.triangles[ar]
-		var pr = mesh.triangles[a]
-		var pl = mesh.triangles[al]
-		var p1 = mesh.triangles[bl]
-		
-		assert(predicates.is_ccw(points[p0], points[pr], points[pl]), "triangle isn't ccw")
-		if predicates.in_circle(points[p0], \
-			points[pr], points[pl], points[p1]):
+		var flip = predicates.in_circle(points[ip0], \
+			points[ip1], points[ip2], points[ip_opp])
 			
-			assert(predicates.is_ccw(points[p0], points[p1], points[pl]), "triangle isn't ccw")
-			assert(predicates.is_ccw(points[p0], points[pr], points[p1]), "triangle isn't ccw")
+		if flip:
+			# flip the two triangles either side of the (half) edge a
+			# and get the new half edge in the middle that originally
+			# belonged to the triangle opposite a (and still does)
+			var new_mid_opp = mesh.flip(a)
 			
-			mesh.triangles[a] = p1
-			mesh.triangles[b] = p0
+			var a_opp = mesh.half_edges[a]
 			
-			var hbl = mesh.half_edges[bl]
-			
-			# hull stuff
-			if (hbl == -1):
+			# if we are replacing a with a hull edge, then we must
+			# take care to update the hull accordingly
+			if (a_opp == -1):
 				var h := 0
 				
-				
-				while h < hull.size() and hull[h] != bl:
+				# search for the edge that shouldn't be in the hull anymore, 
+				# which is the new middle since a's opposite was it's opposite
+				# before
+				while h < hull.size() and hull[h] != new_mid_opp:
 					h += 1
 				
 				if h != hull.size():
 					hull[h] = a
 			
-			mesh.temp(a, hbl)
-			mesh.temp(b, mesh.half_edges[ar])
-			mesh.temp(ar, bl)
-			
-			stack.append(br)
+			# add the next edge to the stack of edges to be legalized
+			stack.append(mesh.previous_half_edge(new_mid_opp))
 		else:
 			if stack.empty():
 				break
