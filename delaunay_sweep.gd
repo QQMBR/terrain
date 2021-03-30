@@ -1,11 +1,10 @@
-
-#TODO long term implement sampling so that it's already sorted if more
+#TODO long term (project wide) implement sampling so that it's already sorted if more
 # performance is needed
-#TODO separate half edge structure and helper functions
-# 	  into separate file
-class_name DelaunaySweep
+#TODO uncommon error where one tri appears to be protruding out 
+# from the surface of the sphere - this doesn't appear to be always in the
+# north pole
 
-const epsilon = 3.3306690738754716e-16
+class_name DelaunaySweep
 
 var stack := []
 
@@ -17,6 +16,7 @@ var hull := []
 var points: Array
 
 ## print out the vertices in matlab format
+#TODO move into mesh and generalize
 #func print_matlab(ps: PoolVector2Array = points) -> String:
 #	var x = ""
 #	var y = ""
@@ -36,32 +36,30 @@ var points: Array
 
 # add a final point to the triangulation that gets connected to 
 # all of the hull edges
-func tie_hull() -> PoolIntArray:
-	
-	# TODO maybe separate triangle creation from legalization and
-	# use the creation part to connect all the hull edges to a new, 
-	# "ghost" point 
-	
-	var add = hull.size() * 3
-	
+func tie_hull() -> HalfEdgeStruct:
 	var new_point = points.size()
 	var old_size = mesh.triangles.size()
 	
-	mesh.triangles.resize(old_size + add)
-	mesh.half_edges.resize(mesh.half_edges.size() + add)
+	var last_half_edge = -1
 	
-	for i in range(0, hull.size()):
+	for i in range(0, hull.size() - 1):
 		
-		# make a cw triangle
-		mesh.triangles[old_size + 3 * i] = new_point
-		mesh.triangles[old_size + 3 * i + 1] = mesh.triangles[_next_half_edge(hull[i])]
-		mesh.triangles[old_size + 3 * i + 2] = mesh.triangles[hull[i]]
-		
-		mesh.temp(hull[i], old_size + 3 * i + 1)
-		mesh.temp(old_size + posmod(3 * i + 5, add), old_size + 3 * i)
-	
-	return PoolIntArray(mesh.triangles)
+		# create a new triangle with a base edge on the hull, connected
+		# to the third edge of the previously added triangle
+		mesh.extend_half_edge_with_point(hull[i], new_point, last_half_edge, -1)
 
+		# the third and last edge added, this is the one that comes before
+		# the edge opposite to the hull edge
+		last_half_edge = old_size + 3 * i + 2
+
+		assert(mesh.triangles[last_half_edge] == new_point, \
+			"wrong half edge used for next end triangle")
+	
+	# add the final tri, wrapping back to the first one created
+	mesh.extend_half_edge_with_point(hull[hull.size() - 1], new_point, \
+		last_half_edge, old_size + 1)
+	
+	return mesh
 
 func _boundary_is_convex() -> bool:
 	var sgn := 0

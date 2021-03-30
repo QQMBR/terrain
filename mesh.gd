@@ -138,8 +138,6 @@ func _link(a: int, b: int) -> void:
 		_link(b, a)
 
 	if b != -1:
-		
-		# 
 		size = half_edges.size()
 		
 		if (b == size):

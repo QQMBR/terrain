@@ -93,13 +93,15 @@ func triangulate_3d(points_verts: Array) -> Array:
 		normals.append(d.Normal)
 	
 	var delaunay = DelaunaySweep.new()
-	var mesh = delaunay.triangulate_sorted(points)
-	var indices = PoolIntArray(mesh.triangles) #delaunay.tie_hull()
+	delaunay.triangulate_sorted(points)
+	var mesh = delaunay.tie_hull()
+	var indices = PoolIntArray(mesh.triangles) 
+	
 	
 	# add the north pole to the sphere, this can't be in the sphere, 
 	# since the stereographic projection is from the north pole
-	#verts.append(NORTH)
-	#normals.append(NORTH)
+	verts.append(NORTH)
+	normals.append(NORTH)
 	
 	# var heightmapper = Heightmapper.new()
 	# verts = heightmapper.assign_height_to_triangulation(delaunay, verts)
